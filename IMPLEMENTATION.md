@@ -15,7 +15,7 @@ Steps:
 2. Parse ingredients/steps from stringified lists to readable text.
 3. Load interactions and compute average rating per recipe.
 4. Merge recipes with average ratings on recipe_id.
-5. Sample N recipes (default 20 in main.py for quick runs).
+5. Sample N recipes (default 20 in config.py for quick runs).
 
 Key functions:
 
@@ -89,8 +89,15 @@ Key function:
 ## 4) How to Run
 
 ```bash
-+uv run python main.py
-+```
+uv run cs568-prepare
+uv run cs568-analyze
+```
+
+Legacy end-to-end run:
+
+```bash
+uv run python main.py
+```
 
 Outputs:
 
@@ -99,7 +106,8 @@ Outputs:
 
 ## 5) Files and Parameters
 
-Main file: main.py
+Package: src/cs568_food_analysis/
+Legacy entrypoint: main.py
 
 Important constants:
 

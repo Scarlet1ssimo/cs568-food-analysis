@@ -8,7 +8,8 @@ Determine what features are important to creating a highly-rated dish. We augmen
 
 ## Repository Structure
 
-- main.py: end-to-end pipeline (data prep, LLM augmentation, model training)
+- src/cs568_food_analysis/: package with data prep, LLM augmentation, and analysis modules
+- main.py: legacy entrypoint that runs both stages end-to-end
 - data/raw/: Food.com datasets (recipes and interactions)
 - data/processed/: generated augmented_recipes.csv
 
@@ -45,6 +46,13 @@ kaggle datasets download -d shuyangli94/food-com-recipes-and-user-interactions -
 ## Run the Pipeline
 
 ```bash
+uv run cs568-prepare
+uv run cs568-analyze
+```
+
+To keep the old behavior (both stages in one go):
+
+```bash
 uv run python main.py
 ```
 
@@ -59,7 +67,7 @@ The pipeline batches 10 recipes per request and sleeps 12 seconds between calls 
 
 ## Configuration
 
-Key parameters in main.py:
+Key parameters in src/cs568_food_analysis/config.py:
 
 - BATCH_SIZE: number of recipes per request (default 10)
 - SAMPLE_SIZE: number of recipes sampled from the merged dataset
