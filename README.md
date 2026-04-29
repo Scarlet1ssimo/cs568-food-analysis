@@ -109,12 +109,7 @@ in the saved plots below.
 
 **Analysis Results**
 
-There are 228 Effective recipes
-
-| Metric | Accuracy | ROC-AUC |
-| --- | --- |
-| LLM (ours) | **0.630** |**0.662**|
-| Baseline | 0.587 | 0.609 |
+Out of 1000 recipes sampled, there are 228 Effective recipes after data cleaning.
 
 | Feature | Coefficient |
 | --- | --- |
@@ -124,6 +119,11 @@ There are 228 Effective recipes
 | presentation_quality | 0.135311 |
 | oiliness | 0.133328 |
 | ingredient_diversity | -0.076834 |
+
+| Metric | Accuracy | ROC-AUC |
+| --- | --- |
+| LLM (ours) | **0.630** |**0.662**|
+| Baseline | 0.587 | 0.609 |
 
 **Analysis Plots**
 - ![Feature Radar](data/processed/feature_radar.png)
