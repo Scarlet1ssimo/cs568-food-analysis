@@ -50,6 +50,19 @@ uv run cs568-prepare
 uv run cs568-analyze
 ```
 
+To save the radar plot instead of showing it:
+
+```bash
+uv run cs568-analyze --plot-path data/processed/feature_radar.png
+```
+
+Evaluation artifacts (ROC curve + confusion matrix) are saved to the processed
+directory by default:
+
+```bash
+uv run cs568-analyze --eval-output-dir data/processed
+```
+
 To keep the old behavior (both stages in one go):
 
 ```bash

@@ -5,7 +5,7 @@ import asyncio
 import logging
 import os
 
-from .analysis import run_logistic_regression
+from .analysis import analyze_with_radar_plot
 from .config import (
     BATCH_SIZE,
     MAX_ITER,
@@ -60,8 +60,16 @@ def analyze_data(
     augmented_path: str,
     target_rating: float,
     max_iter: int,
+    plot_path: str | None = None,
+    eval_output_dir: str | None = None,
 ) -> None:
-    run_logistic_regression(augmented_path, target_rating, max_iter)
+    analyze_with_radar_plot(
+        augmented_path,
+        target_rating,
+        max_iter,
+        plot_path,
+        eval_output_dir,
+    )
 
 
 def _build_prepare_parser() -> argparse.ArgumentParser:
@@ -88,6 +96,16 @@ def _build_analyze_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--target-rating", type=float, default=TARGET_RATING)
     parser.add_argument("--max-iter", type=int, default=MAX_ITER)
+    parser.add_argument(
+        "--plot-path",
+        default=None,
+        help="Optional file path to save the radar plot instead of showing it.",
+    )
+    parser.add_argument(
+        "--eval-output-dir",
+        default=PROCESSED_DIR,
+        help="Directory to save ROC and confusion matrix plots.",
+    )
     return parser
 
 
@@ -114,4 +132,6 @@ def main_analyze() -> None:
         augmented_path=args.augmented_path,
         target_rating=args.target_rating,
         max_iter=args.max_iter,
+        plot_path=args.plot_path,
+        eval_output_dir=args.eval_output_dir,
     )

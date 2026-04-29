@@ -86,6 +86,12 @@ Key function:
 
 - run_logistic_regression
 
+Evaluation additions:
+
+- Baseline features: ingredient_count, steps_length
+- Metrics: accuracy and ROC-AUC for LLM vs baseline
+- Plots: ROC curve overlay + confusion matrix for LLM model
+
 ## 4) How to Run
 
 ```bash
