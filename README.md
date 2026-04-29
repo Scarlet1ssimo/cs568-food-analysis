@@ -121,7 +121,7 @@ Out of 1000 recipes sampled, there are 228 Effective recipes after data cleaning
 | ingredient_diversity | -0.076834 |
 
 | Metric | Accuracy | ROC-AUC |
-| --- | --- |
+| --- | --- | --- |
 | LLM (ours) | **0.630** |**0.662**|
 | Baseline | 0.587 | 0.609 |
 
