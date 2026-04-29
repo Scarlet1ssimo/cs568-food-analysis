@@ -47,8 +47,8 @@ kaggle datasets download -d shuyangli94/food-com-recipes-and-user-interactions -
 ## Run the Pipeline
 
 ```bash
-uv run cs568-prepare
-uv run cs568-analyze
+uv run cs568-prepare # Preparation reqiures LLM API. Results cached under data/processed/
+uv run cs568-analyze # Analyze with cached results
 ```
 
 To save the radar plot instead of showing it:
