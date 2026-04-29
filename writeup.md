@@ -137,7 +137,7 @@ The confusion matrix proves that while we can use data to optimize the underlyin
 
 To prove that our data-driven approach solves a real design problem, we built a generative AI "Recipe Optimizer." We took an adversarial baseline recipe—a heavy, tedious, high-sodium casserole—and instructed the LLM to redesign it strictly following our new Design Rules (reducing complexity via modern appliances, cutting salt/richness, and boosting presentation).
 
-### 1 THE BASELINE RECIPE
+### 1. THE BASELINE RECIPE
 
 *   **Name:** Heavy Salted Cheese & Cream Casserole Mash
     
@@ -146,7 +146,7 @@ To prove that our data-driven approach solves a real design problem, we built a 
 *   **Steps:** Dump everything into a slow cooker. Cook for 8 hours until it becomes a homogenous grey sludge. Add extra salt to taste. Serve in a large messy bowl.
     
 
-### 2 THE OPTIMIZED RECIPE (Air Fryer/Pressure Cooker Modernization)
+### 2. THE OPTIMIZED RECIPE (Air Fryer/Pressure Cooker Modernization)
 
 *   **Name:** Savory Beef & Potato Mash with Herbs
     
@@ -155,7 +155,7 @@ To prove that our data-driven approach solves a real design problem, we built a 
 *   **Steps:** Brown beef in olive oil. Boil potatoes in low-sodium broth for 15-20 mins. Mash together with Greek yogurt and spices. **To plate:** Spoon mash into shallow bowls, drizzle with olive oil, and garnish with fresh rosemary.
     
 
-### 3 THE RESULTS: FEATURE SHIFT & PREDICTION
+### 3. THE RESULTS: FEATURE SHIFT & PREDICTION
 
 When we passed both recipes back through our evaluation pipeline, the data proved the success of the redesign:
 
