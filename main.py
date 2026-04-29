@@ -12,6 +12,7 @@ from cs568_food_analysis.config import (
     SAMPLE_SIZE,
     SLEEP_SECONDS,
     TARGET_RATING,
+    get_interactions_path,
     get_output_path,
 )
 
@@ -28,6 +29,7 @@ def main() -> None:
     )
     analyze_data(
         augmented_path=output_path or get_output_path(PROCESSED_DIR),
+        interactions_path=get_interactions_path(RAW_DIR),
         target_rating=TARGET_RATING,
         max_iter=MAX_ITER,
     )

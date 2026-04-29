@@ -77,23 +77,30 @@ def load_and_prepare_interactions(interactions_path: str) -> pd.DataFrame:
     ][user_id_col]
     filtered = interactions[~interactions[user_id_col].isin(unreliable_users)]
 
-    grouped = (
-        filtered[[recipe_id_col, rating_col]]
-        .groupby(recipe_id_col, as_index=False)
-        .agg(avg_rating=(rating_col, "mean"), rating_count=(rating_col, "count"))
+    filtered = filtered[[recipe_id_col, rating_col]].copy()
+    filtered.rename(
+        columns={recipe_id_col: "recipe_id", rating_col: "rating"},
+        inplace=True,
     )
-    grouped = grouped[grouped["rating_count"] >= 5].copy()
-    grouped.drop(columns=["rating_count"], inplace=True)
-    grouped.rename(columns={recipe_id_col: "recipe_id"}, inplace=True)
-    grouped["recipe_id"] = pd.to_numeric(grouped["recipe_id"], errors="coerce").astype(
+    filtered["recipe_id"] = pd.to_numeric(filtered["recipe_id"], errors="coerce").astype(
         "Int64"
     )
-    return grouped
+    filtered["rating"] = pd.to_numeric(filtered["rating"], errors="coerce")
+    return filtered
 
 
-def merge_recipes_and_ratings(recipes: pd.DataFrame, ratings: pd.DataFrame) -> pd.DataFrame:
-    merged = recipes.merge(ratings, on="recipe_id", how="inner")
-    return merged.dropna(subset=["avg_rating"])
+def filter_recipes_by_review_count(
+    recipes: pd.DataFrame,
+    interactions: pd.DataFrame,
+    min_reviews: int,
+) -> pd.DataFrame:
+    counts = (
+        interactions.groupby("recipe_id", as_index=False)
+        .size()
+        .rename(columns={"size": "rating_count"})
+    )
+    valid_ids = counts[counts["rating_count"] >= min_reviews]["recipe_id"]
+    return recipes[recipes["recipe_id"].isin(valid_ids)].copy()
 
 
 def sample_recipes(merged: pd.DataFrame, sample_size: int) -> pd.DataFrame:

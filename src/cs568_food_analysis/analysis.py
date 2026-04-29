@@ -11,14 +11,57 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, roc_auc_score, roc_curve
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from .config import FEATURE_COLUMNS
+from .config import FEATURE_COLUMNS, MIN_REVIEWS, RAW_DIR, get_interactions_path
+from .data_prep import load_and_prepare_interactions
 
 
 def load_augmented_data(augmented_path: str) -> pd.DataFrame:
     return pd.read_csv(augmented_path)
+
+
+def load_avg_ratings(interactions_path: str, min_reviews: int) -> pd.DataFrame:
+    interactions = load_and_prepare_interactions(interactions_path)
+    grouped = (
+        interactions.groupby("recipe_id", as_index=False)["rating"]
+        .agg(avg_rating="mean", rating_count="count")
+    )
+    grouped = grouped[grouped["rating_count"] >= min_reviews].copy()
+    grouped.drop(columns=["rating_count"], inplace=True)
+    grouped["recipe_id"] = pd.to_numeric(grouped["recipe_id"], errors="coerce").astype(
+        "Int64"
+    )
+    return grouped
+
+
+def attach_avg_ratings(
+    augmented: pd.DataFrame,
+    interactions_path: str,
+    min_reviews: int,
+) -> pd.DataFrame:
+    ratings = load_avg_ratings(interactions_path, min_reviews)
+    return augmented.merge(ratings, on="recipe_id", how="inner")
+
+
+def ensure_avg_ratings(
+    data: pd.DataFrame,
+    interactions_path: str | None,
+    min_reviews: int,
+) -> pd.DataFrame:
+    if "avg_rating" in data.columns:
+        return data
+    resolved_path = interactions_path or get_interactions_path(RAW_DIR)
+    return attach_avg_ratings(data, resolved_path, min_reviews)
+
+
+def get_merged_data(
+    augmented_path: str,
+    interactions_path: str | None,
+    min_reviews: int = MIN_REVIEWS,
+) -> pd.DataFrame:
+    data = load_augmented_data(augmented_path)
+    return ensure_avg_ratings(data, interactions_path, min_reviews)
 
 
 def median_split_targets(data: pd.DataFrame) -> pd.DataFrame:
@@ -32,7 +75,11 @@ def run_logistic_regression_from_df(
     data: pd.DataFrame,
     target_rating: float,
     max_iter: int,
+    interactions_path: str | None = None,
+    min_reviews: int = MIN_REVIEWS,
 ) -> pd.DataFrame:
+    data = ensure_avg_ratings(data, interactions_path, min_reviews)
+
     missing = [col for col in FEATURE_COLUMNS + ["avg_rating"] if col not in data.columns]
     if missing:
         raise RuntimeError(f"Missing required columns in augmented data: {missing}")
@@ -61,11 +108,19 @@ def run_logistic_regression_from_df(
 
 def run_logistic_regression(
     augmented_path: str,
+    interactions_path: str,
+    min_reviews: int,
     target_rating: float,
     max_iter: int,
 ) -> pd.DataFrame:
-    data = load_augmented_data(augmented_path)
-    return run_logistic_regression_from_df(data, target_rating, max_iter)
+    data = get_merged_data(augmented_path, interactions_path, min_reviews)
+    return run_logistic_regression_from_df(
+        data,
+        target_rating,
+        max_iter,
+        interactions_path=interactions_path,
+        min_reviews=min_reviews,
+    )
 
 
 def compute_top_bottom_means(
@@ -109,7 +164,7 @@ def plot_radar_comparison(
     ax.set_xticklabels(labels)
     ax.set_title(title, pad=20)
     ax.legend(loc="upper right", bbox_to_anchor=(1.2, 1.1))
-    ax.set_ylim(1.0, 10.0)
+    ax.set_ylim(3.0, 7.0)
 
     if output_path:
         fig.savefig(output_path, bbox_inches="tight")
@@ -135,17 +190,14 @@ def plot_roc_curves(
     y_test: np.ndarray,
     llm_scores: np.ndarray,
     baseline_scores: np.ndarray,
-    combined_scores: np.ndarray,
     output_path: str | None = None,
 ) -> None:
     llm_fpr, llm_tpr, _ = roc_curve(y_test, llm_scores)
     baseline_fpr, baseline_tpr, _ = roc_curve(y_test, baseline_scores)
-    combined_fpr, combined_tpr, _ = roc_curve(y_test, combined_scores)
 
     fig, ax = plt.subplots(figsize=(7, 5))
     ax.plot(llm_fpr, llm_tpr, label="LLM Features")
     ax.plot(baseline_fpr, baseline_tpr, label="Baseline")
-    ax.plot(combined_fpr, combined_tpr, label="Combined")
     ax.plot([0, 1], [0, 1], linestyle="--", color="gray")
     ax.set_xlabel("False Positive Rate")
     ax.set_ylabel("True Positive Rate")
@@ -170,8 +222,10 @@ def plot_confusion_matrix(
     ax.set_ylabel("Actual")
     ax.set_title("Confusion Matrix")
 
+    threshold = matrix.max() / 2 if matrix.size else 0
     for (row, col), value in np.ndenumerate(matrix):
-        ax.text(col, row, str(value), ha="center", va="center", color="black")
+        color = "white" if value > threshold else "black"
+        ax.text(col, row, str(value), ha="center", va="center", color=color)
 
     ax.set_xticks([0, 1])
     ax.set_yticks([0, 1])
@@ -192,27 +246,24 @@ def evaluate_models(
     max_iter: int,
     output_dir: str | None = None,
 ) -> None:
+    data = ensure_avg_ratings(data, None, MIN_REVIEWS)
     data = data.dropna(subset=FEATURE_COLUMNS + ["avg_rating"]).copy()
     split = median_split_targets(data)
     y = split["target"].to_numpy()
 
     llm_features = split[FEATURE_COLUMNS].to_numpy()
     baseline_features = build_baseline_features(split).to_numpy()
-    combined_features = np.hstack([llm_features, baseline_features])
 
     (
         llm_train,
         llm_test,
         baseline_train,
         baseline_test,
-        combined_train,
-        combined_test,
         y_train,
         y_test,
     ) = train_test_split(
         llm_features,
         baseline_features,
-        combined_features,
         y,
         test_size=0.2,
         random_state=42,
@@ -237,34 +288,20 @@ def evaluate_models(
         class_weight="balanced_subsample",
         random_state=42,
     )
-    combined_model = RandomForestClassifier(
-        n_estimators=400,
-        max_depth=8,
-        min_samples_leaf=2,
-        min_samples_split=6,
-        max_features="sqrt",
-        class_weight="balanced_subsample",
-        random_state=42,
-    )
 
     llm_model.fit(llm_train, y_train)
     baseline_model.fit(baseline_train, y_train)
-    combined_model.fit(combined_train, y_train)
 
     llm_scores = llm_model.predict_proba(llm_test)[:, 1]
     baseline_scores = baseline_model.predict_proba(baseline_test)[:, 1]
-    combined_scores = combined_model.predict_proba(combined_test)[:, 1]
 
     llm_pred = (llm_scores >= 0.5).astype(int)
     baseline_pred = (baseline_scores >= 0.5).astype(int)
-    combined_pred = (combined_scores >= 0.5).astype(int)
 
     llm_accuracy = accuracy_score(y_test, llm_pred)
     baseline_accuracy = accuracy_score(y_test, baseline_pred)
-    combined_accuracy = accuracy_score(y_test, combined_pred)
     llm_auc = roc_auc_score(y_test, llm_scores)
     baseline_auc = roc_auc_score(y_test, baseline_scores)
-    combined_auc = roc_auc_score(y_test, combined_scores)
 
     logging.info(
         "LLM features: accuracy=%.3f, ROC-AUC=%.3f", llm_accuracy, llm_auc
@@ -273,11 +310,6 @@ def evaluate_models(
         "Baseline features: accuracy=%.3f, ROC-AUC=%.3f",
         baseline_accuracy,
         baseline_auc,
-    )
-    logging.info(
-        "Combined features: accuracy=%.3f, ROC-AUC=%.3f",
-        combined_accuracy,
-        combined_auc,
     )
 
     roc_path = None
@@ -291,7 +323,6 @@ def evaluate_models(
         y_test,
         llm_scores,
         baseline_scores,
-        combined_scores,
         output_path=roc_path,
     )
     plot_confusion_matrix(confusion_matrix(y_test, llm_pred), output_path=cm_path)
@@ -299,14 +330,22 @@ def evaluate_models(
 
 def analyze_with_radar_plot(
     augmented_path: str,
+    interactions_path: str,
     target_rating: float,
     max_iter: int,
     output_path: str | None = None,
     eval_output_dir: str | None = None,
 ) -> None:
-    data = load_augmented_data(augmented_path)
-    run_logistic_regression_from_df(data, target_rating, max_iter)
+    data = get_merged_data(augmented_path, interactions_path, MIN_REVIEWS)
+    run_logistic_regression_from_df(
+        data,
+        target_rating,
+        max_iter,
+        interactions_path=interactions_path,
+        min_reviews=MIN_REVIEWS,
+    )
     data = data.dropna(subset=FEATURE_COLUMNS + ["avg_rating"]).copy()
+    logging.info("Effective recipes for analysis: %s", len(data))
     top_means, bottom_means = compute_top_bottom_means(data)
     plot_radar_comparison(top_means, bottom_means, output_path=output_path)
     evaluate_models(data, target_rating, max_iter, output_dir=eval_output_dir)

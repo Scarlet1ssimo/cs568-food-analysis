@@ -8,6 +8,7 @@ import os
 from .analysis import analyze_with_radar_plot
 from .config import (
     BATCH_SIZE,
+    MIN_REVIEWS,
     MAX_ITER,
     MODEL_NAME,
     PROCESSED_DIR,
@@ -20,9 +21,9 @@ from .config import (
     get_recipes_path,
 )
 from .data_prep import (
+    filter_recipes_by_review_count,
     load_and_prepare_interactions,
     load_and_prepare_recipes,
-    merge_recipes_and_ratings,
     sample_recipes,
 )
 from .llm_augment import augment_with_llm
@@ -42,9 +43,9 @@ def prepare_data(
     resolved_output = output_path or get_output_path(processed_dir)
 
     recipes = load_and_prepare_recipes(recipes_path)
-    ratings = load_and_prepare_interactions(interactions_path)
-    merged = merge_recipes_and_ratings(recipes, ratings)
-    sampled = sample_recipes(merged, sample_size)
+    interactions = load_and_prepare_interactions(interactions_path)
+    eligible = filter_recipes_by_review_count(recipes, interactions, MIN_REVIEWS)
+    sampled = sample_recipes(eligible, sample_size)
 
     logging.info("Augmenting %s recipes with LLM features...", len(sampled))
     augmented = asyncio.run(
@@ -58,6 +59,7 @@ def prepare_data(
 
 def analyze_data(
     augmented_path: str,
+    interactions_path: str,
     target_rating: float,
     max_iter: int,
     plot_path: str | None = None,
@@ -65,6 +67,7 @@ def analyze_data(
 ) -> None:
     analyze_with_radar_plot(
         augmented_path,
+        interactions_path,
         target_rating,
         max_iter,
         plot_path,
@@ -93,6 +96,11 @@ def _build_analyze_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--augmented-path",
         default=get_output_path(PROCESSED_DIR),
+    )
+    parser.add_argument(
+        "--interactions-path",
+        default=get_interactions_path(RAW_DIR),
+        help="Path to raw interactions CSV for avg rating calculation.",
     )
     parser.add_argument("--target-rating", type=float, default=TARGET_RATING)
     parser.add_argument("--max-iter", type=int, default=MAX_ITER)
@@ -130,6 +138,7 @@ def main_analyze() -> None:
     args = parser.parse_args()
     analyze_data(
         augmented_path=args.augmented_path,
+        interactions_path=args.interactions_path,
         target_rating=args.target_rating,
         max_iter=args.max_iter,
         plot_path=args.plot_path,

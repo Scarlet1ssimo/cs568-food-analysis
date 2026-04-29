@@ -13,15 +13,14 @@ Steps:
 
 1. Load recipes and keep: recipe_id, name, ingredients, steps.
 2. Parse ingredients/steps from stringified lists to readable text.
-3. Load interactions and compute average rating per recipe.
-4. Merge recipes with average ratings on recipe_id.
-5. Sample N recipes (default 20 in config.py for quick runs).
+3. Load interactions and filter unreliable raters (std=0.0 with multiple reviews).
+4. Filter recipes to those with enough reviews (MIN_REVIEWS).
+5. Sample N recipes (default 1000 in config.py for quick runs).
 
 Key functions:
 
 - load_and_prepare_recipes
 - load_and_prepare_interactions
-- merge_recipes_and_ratings
 - sample_recipes
 
 ## 2) LLM Augmentation (Gemma 3 27B)
@@ -66,7 +65,8 @@ Output:
 
 Target variable:
 
-- target = 1 if avg_rating >= 4.5 else 0
+- avg_rating is computed during analysis from raw interactions
+- target = 1 if avg_rating > median, else 0 (median split)
 
 Feature matrix:
 
@@ -88,8 +88,8 @@ Key function:
 
 Evaluation additions:
 
-- Baseline features: ingredient_count, steps_length
-- Metrics: accuracy and ROC-AUC for LLM vs baseline
+- Baseline feature: ingredient_count
+- Metrics: accuracy and ROC-AUC for LLM vs baseline (RandomForestClassifier)
 - Plots: ROC curve overlay + confusion matrix for LLM model
 
 ## 4) How to Run
@@ -121,6 +121,7 @@ Important constants:
 - SAMPLE_SIZE
 - SLEEP_SECONDS
 - MODEL_NAME
+- MIN_REVIEWS
 - FEATURE_COLUMNS
 
 ## 6) Failure Modes and Troubleshooting

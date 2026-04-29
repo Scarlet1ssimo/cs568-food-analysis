@@ -13,6 +13,7 @@ SAMPLE_SIZE = 1000
 SLEEP_SECONDS = 12
 TARGET_RATING = 4.5
 MAX_ITER = 200
+MIN_REVIEWS = 5
 
 FEATURE_COLUMNS: List[str] = [
     "presentation_quality",
