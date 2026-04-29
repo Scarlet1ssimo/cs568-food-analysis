@@ -78,6 +78,8 @@ More importantly, we look at **ROC-AUC (Area Under the Receiver Operating Charac
 
 **What this implies:** Human taste is notoriously subjective, noisy, and difficult to predict. The visual lift in the ROC curve proves the effectiveness of our approach. We successfully captured real statistical signals from human taste preferences—showing that qualitative sensory design features are vastly superior to quantitative text metrics when evaluating food.
 
+![ROC Curve](data/processed/roc_curve.png)
+
 ### 4.2 Feature Importances: The Design Rules of Cooking
 
 Using our Logistic Regression model, we extracted the coefficients (weights) for each feature. A positive coefficient means the feature increases the likelihood of a high rating; a negative coefficient means it hurts the rating.
@@ -112,6 +114,7 @@ By comparing the average LLM scores of the Top 10% highest-rated dishes against 
     
 *   **The Contraction in Complexity and Saltiness:** Conversely, the blue shape (Top 10%) distinctly pulls inward on the complexity\_of\_preparation and saltiness axes compared to the bottom-tier recipes.
     
+![Feature Radar](data/processed/feature_radar.png)
 
 This visualization effectively summarizes our findings: the ideal recipe is one that looks spectacular, requires minimal friction to prepare, and completely avoids heavy sodium.
 
@@ -122,7 +125,8 @@ To maintain academic rigor, we must also examine where our model falls short. Th
 **How to read this chart:** \* The **darker diagonal cells** represent correct predictions (e.g., the model predicted a recipe would be highly rated, and it actually was).
 
 *   The **lighter off-diagonal cells** represent errors—instances where our model confidently predicted a certain outcome, but the actual diners disagreed.
-    
+
+![Confusion Matrix](data/processed/confusion_matrix.png)
 
 **Why it matters:** This chart honestly visualizes the boundaries of quantitative design in a highly subjective domain. Why does the model make mistakes? Because the ultimate evaluator is a human being. A recipe might perfectly adhere to our "Design Rules"—featuring low salt, low complexity, and a beautiful presentation—but a specific diner might still give it a 1-star rating simply because they personally dislike a specific ingredient or had a bad day.
 
@@ -133,9 +137,7 @@ The confusion matrix proves that while we can use data to optimize the underlyin
 
 To prove that our data-driven approach solves a real design problem, we built a generative AI "Recipe Optimizer." We took an adversarial baseline recipe—a heavy, tedious, high-sodium casserole—and instructed the LLM to redesign it strictly following our new Design Rules (reducing complexity via modern appliances, cutting salt/richness, and boosting presentation).
 
-### 1
-
-THE BASELINE RECIPE
+### 1 THE BASELINE RECIPE
 
 *   **Name:** Heavy Salted Cheese & Cream Casserole Mash
     
@@ -144,9 +146,7 @@ THE BASELINE RECIPE
 *   **Steps:** Dump everything into a slow cooker. Cook for 8 hours until it becomes a homogenous grey sludge. Add extra salt to taste. Serve in a large messy bowl.
     
 
-### 2
-
-THE OPTIMIZED RECIPE (Air Fryer/Pressure Cooker Modernization)
+### 2 THE OPTIMIZED RECIPE (Air Fryer/Pressure Cooker Modernization)
 
 *   **Name:** Savory Beef & Potato Mash with Herbs
     
@@ -155,9 +155,7 @@ THE OPTIMIZED RECIPE (Air Fryer/Pressure Cooker Modernization)
 *   **Steps:** Brown beef in olive oil. Boil potatoes in low-sodium broth for 15-20 mins. Mash together with Greek yogurt and spices. **To plate:** Spoon mash into shallow bowls, drizzle with olive oil, and garnish with fresh rosemary.
     
 
-### 3
-
-THE RESULTS: FEATURE SHIFT & PREDICTION
+### 3 THE RESULTS: FEATURE SHIFT & PREDICTION
 
 When we passed both recipes back through our evaluation pipeline, the data proved the success of the redesign:
 
