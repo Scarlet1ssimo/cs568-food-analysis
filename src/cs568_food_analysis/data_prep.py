@@ -62,17 +62,29 @@ def load_and_prepare_recipes(recipes_path: str) -> pd.DataFrame:
 
 def load_and_prepare_interactions(interactions_path: str) -> pd.DataFrame:
     interactions = pd.read_csv(interactions_path)
+    user_id_col = _find_column(interactions.columns, ["user_id", "user", "author_id"])
     recipe_id_col = _find_column(interactions.columns, ["recipe_id", "id"])
     rating_col = _find_column(interactions.columns, ["rating", "stars"])
+
+    user_stats = (
+        interactions[[user_id_col, rating_col]]
+        .groupby(user_id_col)[rating_col]
+        .agg(["std", "count"])
+        .reset_index()
+    )
+    unreliable_users = user_stats[
+        (user_stats["count"] > 1) & (user_stats["std"] == 0.0)
+    ][user_id_col]
+    filtered = interactions[~interactions[user_id_col].isin(unreliable_users)]
+
     grouped = (
-        interactions[[recipe_id_col, rating_col]]
+        filtered[[recipe_id_col, rating_col]]
         .groupby(recipe_id_col, as_index=False)
-        .mean()
+        .agg(avg_rating=(rating_col, "mean"), rating_count=(rating_col, "count"))
     )
-    grouped.rename(
-        columns={recipe_id_col: "recipe_id", rating_col: "avg_rating"},
-        inplace=True,
-    )
+    grouped = grouped[grouped["rating_count"] >= 5].copy()
+    grouped.drop(columns=["rating_count"], inplace=True)
+    grouped.rename(columns={recipe_id_col: "recipe_id"}, inplace=True)
     grouped["recipe_id"] = pd.to_numeric(grouped["recipe_id"], errors="coerce").astype(
         "Int64"
     )

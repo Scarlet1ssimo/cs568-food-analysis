@@ -7,6 +7,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, roc_auc_score, roc_curve
 from sklearn.model_selection import train_test_split
@@ -20,6 +21,13 @@ def load_augmented_data(augmented_path: str) -> pd.DataFrame:
     return pd.read_csv(augmented_path)
 
 
+def median_split_targets(data: pd.DataFrame) -> pd.DataFrame:
+    median_rating = data["avg_rating"].median()
+    split = data.copy()
+    split["target"] = (split["avg_rating"] > median_rating).astype(int)
+    return split
+
+
 def run_logistic_regression_from_df(
     data: pd.DataFrame,
     target_rating: float,
@@ -30,9 +38,9 @@ def run_logistic_regression_from_df(
         raise RuntimeError(f"Missing required columns in augmented data: {missing}")
 
     data = data.dropna(subset=FEATURE_COLUMNS + ["avg_rating"]).copy()
-    data["target"] = (data["avg_rating"] >= target_rating).astype(int)
-    X = data[FEATURE_COLUMNS].to_numpy()
-    y = data["target"].to_numpy()
+    split = median_split_targets(data)
+    X = split[FEATURE_COLUMNS].to_numpy()
+    y = split["target"].to_numpy()
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
@@ -116,33 +124,28 @@ def build_baseline_features(data: pd.DataFrame) -> pd.DataFrame:
         raise RuntimeError("Missing ingredients or steps columns for baseline features")
 
     ingredients = data["ingredients"].fillna("")
-    steps = data["steps"].fillna("")
-
     ingredient_count = ingredients.apply(
         lambda value: len([item for item in value.split(",") if item.strip()])
     )
-    steps_length = steps.str.len()
 
-    return pd.DataFrame(
-        {
-            "ingredient_count": ingredient_count,
-            "steps_length": steps_length,
-        }
-    )
+    return pd.DataFrame({"ingredient_count": ingredient_count})
 
 
 def plot_roc_curves(
     y_test: np.ndarray,
     llm_scores: np.ndarray,
     baseline_scores: np.ndarray,
+    combined_scores: np.ndarray,
     output_path: str | None = None,
 ) -> None:
     llm_fpr, llm_tpr, _ = roc_curve(y_test, llm_scores)
     baseline_fpr, baseline_tpr, _ = roc_curve(y_test, baseline_scores)
+    combined_fpr, combined_tpr, _ = roc_curve(y_test, combined_scores)
 
     fig, ax = plt.subplots(figsize=(7, 5))
     ax.plot(llm_fpr, llm_tpr, label="LLM Features")
     ax.plot(baseline_fpr, baseline_tpr, label="Baseline")
+    ax.plot(combined_fpr, combined_tpr, label="Combined")
     ax.plot([0, 1], [0, 1], linestyle="--", color="gray")
     ax.set_xlabel("False Positive Rate")
     ax.set_ylabel("True Positive Rate")
@@ -190,43 +193,78 @@ def evaluate_models(
     output_dir: str | None = None,
 ) -> None:
     data = data.dropna(subset=FEATURE_COLUMNS + ["avg_rating"]).copy()
-    y = (data["avg_rating"] >= target_rating).astype(int).to_numpy()
+    split = median_split_targets(data)
+    y = split["target"].to_numpy()
 
-    llm_features = data[FEATURE_COLUMNS].to_numpy()
-    baseline_features = build_baseline_features(data).to_numpy()
+    llm_features = split[FEATURE_COLUMNS].to_numpy()
+    baseline_features = build_baseline_features(split).to_numpy()
+    combined_features = np.hstack([llm_features, baseline_features])
 
     (
         llm_train,
         llm_test,
         baseline_train,
         baseline_test,
+        combined_train,
+        combined_test,
         y_train,
         y_test,
     ) = train_test_split(
         llm_features,
         baseline_features,
+        combined_features,
         y,
         test_size=0.2,
         random_state=42,
         stratify=y,
     )
 
-    llm_model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=max_iter))
-    baseline_model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=max_iter))
+    llm_model = RandomForestClassifier(
+        n_estimators=400,
+        max_depth=8,
+        min_samples_leaf=2,
+        min_samples_split=6,
+        max_features="sqrt",
+        class_weight="balanced_subsample",
+        random_state=42,
+    )
+    baseline_model = RandomForestClassifier(
+        n_estimators=400,
+        max_depth=8,
+        min_samples_leaf=2,
+        min_samples_split=6,
+        max_features="sqrt",
+        class_weight="balanced_subsample",
+        random_state=42,
+    )
+    combined_model = RandomForestClassifier(
+        n_estimators=400,
+        max_depth=8,
+        min_samples_leaf=2,
+        min_samples_split=6,
+        max_features="sqrt",
+        class_weight="balanced_subsample",
+        random_state=42,
+    )
 
     llm_model.fit(llm_train, y_train)
     baseline_model.fit(baseline_train, y_train)
+    combined_model.fit(combined_train, y_train)
 
     llm_scores = llm_model.predict_proba(llm_test)[:, 1]
     baseline_scores = baseline_model.predict_proba(baseline_test)[:, 1]
+    combined_scores = combined_model.predict_proba(combined_test)[:, 1]
 
     llm_pred = (llm_scores >= 0.5).astype(int)
     baseline_pred = (baseline_scores >= 0.5).astype(int)
+    combined_pred = (combined_scores >= 0.5).astype(int)
 
     llm_accuracy = accuracy_score(y_test, llm_pred)
     baseline_accuracy = accuracy_score(y_test, baseline_pred)
+    combined_accuracy = accuracy_score(y_test, combined_pred)
     llm_auc = roc_auc_score(y_test, llm_scores)
     baseline_auc = roc_auc_score(y_test, baseline_scores)
+    combined_auc = roc_auc_score(y_test, combined_scores)
 
     logging.info(
         "LLM features: accuracy=%.3f, ROC-AUC=%.3f", llm_accuracy, llm_auc
@@ -236,6 +274,11 @@ def evaluate_models(
         baseline_accuracy,
         baseline_auc,
     )
+    logging.info(
+        "Combined features: accuracy=%.3f, ROC-AUC=%.3f",
+        combined_accuracy,
+        combined_auc,
+    )
 
     roc_path = None
     cm_path = None
@@ -244,7 +287,13 @@ def evaluate_models(
         roc_path = os.path.join(output_dir, "roc_curve.png")
         cm_path = os.path.join(output_dir, "confusion_matrix.png")
 
-    plot_roc_curves(y_test, llm_scores, baseline_scores, output_path=roc_path)
+    plot_roc_curves(
+        y_test,
+        llm_scores,
+        baseline_scores,
+        combined_scores,
+        output_path=roc_path,
+    )
     plot_confusion_matrix(confusion_matrix(y_test, llm_pred), output_path=cm_path)
 
 
