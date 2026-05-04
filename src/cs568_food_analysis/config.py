@@ -8,7 +8,8 @@ PROCESSED_DIR = "data/processed"
 OUTPUT_FILENAME = "augmented_recipes.csv"
 
 MODEL_NAME = "gemma-3-27b-it"
-BATCH_SIZE = 10
+LLM_PROVIDER = "google"
+BATCH_SIZE = 100
 SAMPLE_SIZE = 1000
 SLEEP_SECONDS = 12
 TARGET_RATING = 4.5

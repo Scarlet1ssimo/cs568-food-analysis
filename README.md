@@ -1,6 +1,6 @@
 # CS 568 Food Analysis
 
-This project investigates which recipe attributes correlate with high ratings in the Food.com dataset. It augments recipes with LLM-generated quantitative tags using Google AI Studio's Gemma 3 27B model, then trains a logistic regression model to identify the strongest predictors.
+This project investigates which recipe attributes correlate with high ratings in the Food.com dataset. It augments recipes with LLM-generated quantitative tags through LangChain (provider-configurable), then trains a logistic regression model to identify the strongest predictors.
 
 ## Project Objective
 
@@ -18,7 +18,9 @@ Determine what features are important to creating a highly-rated dish. We augmen
 
 - Python 3.14+
 - uv (package manager)
-- GEMINI_API_KEY in .env for LLM calls
+- One provider API key in .env for LLM calls:
+     - GEMINI_API_KEY (for --llm-provider google)
+     - OPENAI_API_KEY (for --llm-provider openai)
 
 ## Setup
 
@@ -29,10 +31,11 @@ uv sync
 cp .env.sample .env
 ```
 
-Edit .env and set:
+Edit .env and set at least one key:
 
 ```
 GEMINI_API_KEY=your_key_here
+OPENAI_API_KEY=your_key_here
 ```
 
 ## Data Preparation
@@ -49,6 +52,13 @@ kaggle datasets download -d shuyangli94/food-com-recipes-and-user-interactions -
 ```bash
 uv run cs568-prepare # Preparation reqiures LLM API. Results cached under data/processed/
 uv run cs568-analyze # Analyze with cached results
+```
+
+Choose provider/model explicitly when needed:
+
+```bash
+uv run cs568-prepare --llm-provider google --model-name gemini-2.5-flash
+uv run cs568-prepare --llm-provider openai --model-name gpt-4o-mini
 ```
 
 To save the radar plot instead of showing it:
@@ -91,7 +101,7 @@ How everything is calculated:
 
 - Data cleaning: remove unreliable users (std=0.0 with multiple reviews), then keep
      recipes with at least `MIN_REVIEWS` reviews.
-- LLM augmentation: each recipe gets six 1.0-10.0 aspect scores from Gemma 3.
+- LLM augmentation: each recipe gets six 1.0-10.0 aspect scores from a LangChain-backed provider (Google/OpenAI).
 - Target: compute `avg_rating` from raw interactions, then apply a median split
      (rating > median => 1, else 0).
 - Baseline: a single numeric feature, `ingredient_count` (number of comma-separated

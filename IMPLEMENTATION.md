@@ -23,7 +23,7 @@ Key functions:
 - load_and_prepare_interactions
 - sample_recipes
 
-## 2) LLM Augmentation (Gemma 3 27B)
+## 2) LLM Augmentation (LangChain Providers)
 
 Goal: generate continuous scores (1.0-10.0) for six recipe attributes:
 
@@ -50,6 +50,12 @@ Robustness:
 - Tenacity exponential backoff for LlmResponseError
 - JSON extraction and schema validation
 - recipe_id normalized to numeric to avoid merge dtype mismatches
+
+LLM backend:
+
+- LangChain chat model abstraction
+- Supported providers: google/gemini and openai
+- Provider selected via CLI flag `--llm-provider`
 
 Key functions:
 
@@ -126,7 +132,8 @@ Important constants:
 
 ## 6) Failure Modes and Troubleshooting
 
-- Missing GEMINI_API_KEY: set in .env
+- Missing GEMINI_API_KEY: required for `--llm-provider google`
+- Missing OPENAI_API_KEY: required for `--llm-provider openai`
 - Merge dtype error on recipe_id: ensure numeric recipe_id in LLM output
 - JSON parse errors: check model response format
 - Rate limit errors: keep BATCH_SIZE and SLEEP_SECONDS unchanged

@@ -8,6 +8,7 @@ import os
 from .analysis import analyze_with_radar_plot
 from .config import (
     BATCH_SIZE,
+    LLM_PROVIDER,
     MIN_REVIEWS,
     MAX_ITER,
     MODEL_NAME,
@@ -35,6 +36,7 @@ def prepare_data(
     sample_size: int,
     batch_size: int,
     sleep_seconds: int,
+    llm_provider: str,
     model_name: str,
     output_path: str | None = None,
 ) -> str:
@@ -49,7 +51,7 @@ def prepare_data(
 
     logging.info("Augmenting %s recipes with LLM features...", len(sampled))
     augmented = asyncio.run(
-        augment_with_llm(sampled, batch_size, sleep_seconds, model_name)
+        augment_with_llm(sampled, batch_size, sleep_seconds, llm_provider, model_name)
     )
     os.makedirs(processed_dir, exist_ok=True)
     augmented.to_csv(resolved_output, index=False)
@@ -84,6 +86,7 @@ def _build_prepare_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sample-size", type=int, default=SAMPLE_SIZE)
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     parser.add_argument("--sleep-seconds", type=int, default=SLEEP_SECONDS)
+    parser.add_argument("--llm-provider", default=LLM_PROVIDER)
     parser.add_argument("--model-name", default=MODEL_NAME)
     parser.add_argument("--output-path", default=None)
     return parser
@@ -127,6 +130,7 @@ def main_prepare() -> None:
         sample_size=args.sample_size,
         batch_size=args.batch_size,
         sleep_seconds=args.sleep_seconds,
+        llm_provider=args.llm_provider,
         model_name=args.model_name,
         output_path=args.output_path,
     )

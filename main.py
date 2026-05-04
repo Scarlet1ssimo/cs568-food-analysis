@@ -5,6 +5,7 @@ import logging
 from cs568_food_analysis.cli import analyze_data, prepare_data
 from cs568_food_analysis.config import (
     BATCH_SIZE,
+    LLM_PROVIDER,
     MAX_ITER,
     MODEL_NAME,
     PROCESSED_DIR,
@@ -25,6 +26,7 @@ def main() -> None:
         sample_size=SAMPLE_SIZE,
         batch_size=BATCH_SIZE,
         sleep_seconds=SLEEP_SECONDS,
+        llm_provider=LLM_PROVIDER,
         model_name=MODEL_NAME,
     )
     analyze_data(

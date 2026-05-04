@@ -1,12 +1,31 @@
-# NOTE: uv is required as a Python package manager, checkout https://docs.astral.sh/uv/getting-started/installation/
+#!/usr/bin/env sh
+
+# NOTE: uv is required as a Python package manager.
+# Install docs: https://docs.astral.sh/uv/getting-started/installation/
+
+set -eu
+
+if ! command -v uv >/dev/null 2>&1; then
+	echo "Error: uv is not installed or not on PATH."
+	exit 1
+fi
+
 uv sync
-source .venv/bin/activate # This should give you `kaggle` CLI.
 
 mkdir -p data/raw data/processed
-kaggle datasets download -d shuyangli94/food-com-recipes-and-user-interactions -p data/raw --unzip
 
-# NOTE: You need to create a .env file with Gemini API key. Checkout https://aistudio.google.com/api-keys
-# Gemma 3 27B is available and free at a rate limit of 30 RPM (round per minute), 15K TPM (tokens per minute), and 14.4k RPD (requests per day).
-cp .env.example .env
+# Use uv run to execute kaggle from the project environment in a shell-agnostic way.
+uv run kaggle datasets download \
+	-d shuyangli94/food-com-recipes-and-user-interactions \
+	-p data/raw \
+	--unzip
 
-uv run main.py
+# NOTE: Create a .env file with your LLM provider API key(s).
+# Gemini key docs: https://aistudio.google.com/api-keys
+# OpenAI key docs: https://platform.openai.com/api-keys
+cp .env.sample .env
+
+# Example runs:
+# uv run cs568-prepare --llm-provider google --model-name gemini-2.5-flash
+# uv run cs568-prepare --llm-provider openai --model-name gpt-4o-mini
+# uv run cs568-analyze

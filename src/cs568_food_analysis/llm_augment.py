@@ -8,7 +8,6 @@ from typing import Any, Dict, List
 
 import pandas as pd
 from dotenv import load_dotenv
-from google import genai
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from .config import FEATURE_COLUMNS
@@ -36,7 +35,7 @@ def chunk_dataframe(frame: pd.DataFrame, batch_size: int) -> List[pd.DataFrame]:
 def build_prompt(batch: pd.DataFrame) -> str:
     payload = [
         RecipeRecord(
-            recipe_id=int(row.recipe_id),
+            recipe_id=int(str(row.recipe_id)),
             name=str(row.name),
             ingredients=str(row.ingredients),
             steps=str(row.steps),
@@ -97,26 +96,67 @@ Input JSON:
 """
 
 
+def _extract_response_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        fragments: List[str] = []
+        for item in content:
+            if isinstance(item, str):
+                fragments.append(item)
+            elif isinstance(item, dict) and "text" in item:
+                fragments.append(str(item["text"]))
+        return "\n".join(fragments)
+    return ""
+
+
+def create_llm_client(llm_provider: str, model_name: str) -> Any:
+    provider = llm_provider.strip().lower()
+    if provider in {"google", "gemini"}:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY is missing from environment")
+        return ChatGoogleGenerativeAI(
+            model=model_name,
+            google_api_key=api_key,
+            temperature=0,
+        )
+
+    if provider == "openai":
+        from langchain_openai import ChatOpenAI
+
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY is missing from environment")
+        return ChatOpenAI(model=model_name, temperature=0)
+
+    raise ValueError(
+        f"Unsupported llm provider '{llm_provider}'. Supported values: google, gemini, openai"
+    )
+
+
 @retry(
     retry=retry_if_exception_type(LlmResponseError),
     wait=wait_exponential(multiplier=1, min=2, max=30),
     stop=stop_after_attempt(5),
 )
 def generate_batch_features(
-    client: genai.Client,
+    client: Any,
     prompt: str,
     batch_size: int,
-    model_name: str,
 ) -> List[Dict[str, Any]]:
-    response = client.models.generate_content(model=model_name, contents=prompt)
-    if not response or not response.text:
+    response = client.invoke(prompt)
+    response_text = _extract_response_text(response.content)
+    if not response_text:
         raise LlmResponseError("Empty response from model")
     try:
-        start = response.text.find("[")
-        end = response.text.rfind("]")
+        start = response_text.find("[")
+        end = response_text.rfind("]")
         if start == -1 or end == -1:
             raise ValueError("Missing JSON array brackets")
-        parsed = json.loads(response.text[start : end + 1])
+        parsed = json.loads(response_text[start : end + 1])
     except (json.JSONDecodeError, ValueError) as exc:
         raise LlmResponseError("Failed to parse JSON response") from exc
 
@@ -135,14 +175,11 @@ async def augment_with_llm(
     sampled: pd.DataFrame,
     batch_size: int,
     sleep_seconds: int,
+    llm_provider: str,
     model_name: str,
 ) -> pd.DataFrame:
     load_dotenv()
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY is missing from environment")
-
-    client = genai.Client(api_key=api_key)
+    client = create_llm_client(llm_provider, model_name)
     batches = chunk_dataframe(sampled, batch_size)
     outputs: List[Dict[str, Any]] = []
 
@@ -153,7 +190,6 @@ async def augment_with_llm(
             client,
             prompt,
             len(batch),
-            model_name,
         )
         outputs.extend(batch_features)
         if index < len(batches) - 1:
